@@ -12,7 +12,7 @@ output:
 
 ![](time.jpg)
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 library(tidyverse) ## data manipulation
 library(forecast) ## time series analyses
 ```
