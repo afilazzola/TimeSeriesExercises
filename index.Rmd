@@ -1,0 +1,219 @@
+---
+title: 'An Introduction to Time Series Analysis with R'
+author: "Alex Filazzola"
+date: "Nov 2019"
+output:
+  html_document:
+    theme: yeti
+    toc: yes
+    toc_float: yes
+    toc_depth: 3
+---
+
+![](time.jpg)
+
+```{r}
+library(tidyverse) ## data manipulation
+library(forecast) ## time series analyses
+```
+
+
+### Loading data and stripping time
+```{r}
+## read data
+station <- read.csv("data//climateStation.csv")
+station[,"Date.Time"]<- paste0(station[,"Date.Time"], "-01") ## attach first day of the month 
+
+## date manipulations
+station[,"Date.Time"] <- as.character(station[,"Date.Time"]) %>% as.Date(., "%Y-%m-%d")
+station[,"Year"] <- format(station[,"Date.Time"], "%Y")
+station[,"Month"] <- format(station[,"Date.Time"], "%m")
+
+
+```
+
+
+### Data viz and training:testing
+```{r}
+
+### plot data
+ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") + theme(text = element_text(size=20))
+
+## show months
+ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") + geom_point(col="blue") + theme(text = element_text(size=20))
+
+## separate into testing and training
+station[,"DataTest"] <- ifelse(station$Year < 2006, "train", "test")
+
+## Identify testing vs training dataset
+ggplot(station, aes(x=Date.Time, y= TempMax, col=DataTest)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank())
+```
+
+
+### Types of prediction
+```{r}
+## select training data
+train <- subset(station, DataTest == "train")
+test <- subset(station, DataTest == "test")
+
+## load function for RMSE evaluation
+RMSE = function(m, o){
+  sqrt(mean((m - o)^2))
+}
+
+
+## Naive prediction
+max(train$Year)
+yrAvg <- train %>%  group_by(Year) %>%  summarize(avg=mean(TempMax)) %>%  filter(Year==2005)
+
+ggplot(station, aes(x=Date.Time, y= TempMax, col=DataTest)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) +
+  geom_segment(aes(x=test[1,"Date.Time"], y=13.1, xend=test[60,"Date.Time"], yend=13.1), color="red", lwd=2)
+
+## Evaluate
+RMSE(test$TempMax, 13.1)
+
+
+## Simple Average
+mean(train$TempMax)
+
+ggplot(station, aes(x=Date.Time, y= TempMax, col=DataTest)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) +
+  geom_segment(aes(x=test[1,"Date.Time"], y=12.75, xend=test[60,"Date.Time"], yend=12.75), color="red", lwd=2)
+
+## Evaluate
+RMSE(test$TempMax, 12.75)
+
+## Select average
+mean(train[train$Year>2000, "TempMax"])
+
+ggplot(station, aes(x=Date.Time, y= TempMax, col=DataTest)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) +
+  geom_segment(aes(x=test[1,"Date.Time"], y=12.94, xend=test[60,"Date.Time"], yend=12.94), color="red", lwd=2)
+
+## Evaluate
+RMSE(test$TempMax, 12.94)
+```
+
+
+### AR model
+```{r}
+
+ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) 
+
+pacf(station$TempMax, main="Hamilton Station", ylab="Partial ACF", cex.lab=1.5, cex.axis=1.3)
+
+```
+
+### Identify Model
+```{r}
+
+### AR model first
+ar <- arima(station$TempMax, order=c(1,0,0))
+summary(ar)
+
+## plot model fits
+arfit <- station$TempMax - residuals(ar)
+ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) +
+  geom_line(aes(x=Date.Time, y= arfit), col="Red")
+
+## Forecast using AR
+artrain <- arima(train$TempMax, order=c(1,0,0))
+predictAR <- predict(artrain, n.ahead=60)
+
+## extract vector
+predData <- data.frame(Date.Time= test$Date.Time, TempMax=as.vector(predictAR$pred), error = as.vector(predictAR$se))
+
+## plot forecast
+ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) +
+  geom_line( data = predData,  aes(x=Date.Time, y=TempMax), col="Red") + geom_ribbon(data = predData,  aes(x=Date.Time, ymin=TempMax-error, ymax=TempMax+error), alpha=0.2)
+
+## Evaluate
+RMSE(test$TempMax, predData$TempMax)
+
+### Fit a MA model
+ma <- arima(station$TempMax, order=c(0,0,1))
+summary(ma)
+
+## Plot MA model
+mafit <- station$TempMax - residuals(ma)
+ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) +
+  geom_line(aes(x=Date.Time, y= mafit), col="Red")
+
+## Forecast using MA
+matrain <- arima(train$TempMax, order=c(0,0,1))
+predictMA <- predict(matrain, n.ahead=60)
+
+## extract vector
+predData <- data.frame(Date.Time= test$Date.Time, TempMax=as.vector(predictMA$pred), error = as.vector(predictMA$se))
+
+## plot forecast
+ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") +  scale_colour_manual(values=c("#56B4E9","black")) + theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) +
+  geom_line( data = predData,  aes(x=Date.Time, y=TempMax), col="Red") + geom_ribbon(data = predData,  aes(x=Date.Time, ymin=TempMax-error, ymax=TempMax+error), alpha=0.2)
+
+## Evaluate
+RMSE(test$TempMax, predData$TempMax)
+
+### Choosing between the best model
+cor(arfit, mafit) ## similar
+
+## Check AIC
+AIC(ar) ## AR
+AIC(ma) ## MA
+
+## Is the AIC of AR better?
+AIC(ar) < AIC(ma) 
+
+
+## Is the BIC of AR better?
+BIC(ar) < BIC(ma) 
+```
+
+### Find p, q, & d for ARIMA
+```{r}
+### First remove stationarity
+
+### Generate Random data
+set.seed(0)
+timeseries=arima.sim(list(order = c(1,1,2), ma=c(0.32,0.47), ar=0.8), n = 50)+50
+newdata <- data.frame(time=1:length(timeseries), rh = timeseries)
+
+## plot data
+ggplot(newdata, aes(x=time, y= rh)) + geom_line() + ylim(0,80) + xlab("Date of experiment") + ylab("Average daily humidity")+ theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank())
+
+## Plot ACF
+acf(newdata$rh)
+
+## Generate 1st difference
+diffdata <- data.frame(time= 1:(length(timeseries)-1), rh=diff(newdata$rh))
+
+## Calculate difference of data
+ggplot(diffdata, aes(x=time, y= rh)) + geom_line() + ylim(-10,10) + xlab("Date of experiment") + ylab("Average daily humidity")+ theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank())
+
+## Plot ACF
+acf(diffdata$rh) ## cuts off after lag 3, using a moving average of 3
+
+## 1st order seems acceptable
+
+## Plot PACF
+pacf(diffdata$rh) ## cuts off after lag 1, using a autoregression of 1
+
+## ARIMA(1,1,3) & ARIMA(1,2,3)
+train <- newdata[1:40,] ## create new training dataset
+test <- newdata[41:50,] ## create new testing dataset
+
+
+arima1 <- arima(train$rh, order=c(1,1,3))
+arima2 <- arima(train$rh, order=c(1,2,3))
+
+arima1
+arima2
+
+predAR1 <- data.frame(time=40:50, rh=predict(arima1, 11))
+predAR2 <- data.frame(time=40:50, rh=predict(arima2, 11))
+
+## Plot forecasts
+
+ggplot(train, aes(x=time, y= rh)) + geom_line(lwd=2) + ylim(0,80) + xlab("Date of experiment") + ylab("Average daily humidity")+ theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) + xlim(0,51) + geom_point(data=test, aes(x=time, y=rh), cex=2)+
+  geom_line(data=predAR1, aes(x=time, y=rh.pred), color="orange", lwd=2)+
+  geom_line(data=predAR2, aes(x=time, y=rh.pred), color="blue", lwd=2)
+  
+
+
