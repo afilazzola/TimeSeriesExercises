@@ -39,6 +39,10 @@ station[,"Month"] <- format(station[,"Date.Time"], "%m")
 ### plot data
 ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") + theme(text = element_text(size=20))
 
+## Decompose data
+stationts <- ts(station$TempMax, frequency=12) ## frequency per 12 months
+plot(decompose(stationts), cex.axis=1.3, cex.lab=1.5)
+
 ## show months
 ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xlab("Date for Hamilton Station") + ylab("Average Maximum Temperature (C°)") + geom_point(col="blue") + theme(text = element_text(size=20))
 
@@ -101,6 +105,7 @@ ggplot(station, aes(x=Date.Time, y= TempMax)) + geom_line() + ylim(-20,40) + xla
 pacf(station$TempMax, main="Hamilton Station", ylab="Partial ACF", cex.lab=1.5, cex.axis=1.3)
 
 ```
+
 
 ### Identifying ARIMA Models
 ```{r}
@@ -165,10 +170,8 @@ AIC(ar) < AIC(ma)
 BIC(ar) < BIC(ma) 
 ```
 
-### Find p, q, & d for ARIMA
+### EDA to find p,q,d 
 ```{r}
-### First remove stationarity
-
 ### Generate Random data
 set.seed(0)
 timeseries=arima.sim(list(order = c(1,1,2), ma=c(0.32,0.47), ar=0.8), n = 50)+50
@@ -177,23 +180,30 @@ newdata <- data.frame(time=1:length(timeseries), rh = timeseries)
 ## plot data
 ggplot(newdata, aes(x=time, y= rh)) + geom_line() + ylim(0,80) + xlab("Date of experiment") + ylab("Average daily humidity")+ theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank())
 
+### First remove stationarity
+
 ## Plot ACF
 acf(newdata$rh)
+
 
 ## Generate 1st difference
 diffdata <- data.frame(time= 1:(length(timeseries)-1), rh=diff(newdata$rh))
 
 ## Calculate difference of data
 ggplot(diffdata, aes(x=time, y= rh)) + geom_line() + ylim(-10,10) + xlab("Date of experiment") + ylab("Average daily humidity")+ theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank())
+## 1st order seems acceptable
 
 ## Plot ACF
 acf(diffdata$rh) ## cuts off after lag 3, using a moving average of 3
 
-## 1st order seems acceptable
 
 ## Plot PACF
 pacf(diffdata$rh) ## cuts off after lag 1, using a autoregression of 1
 
+```
+
+### Running ARIMA model
+```{r}
 ## ARIMA(1,1,3) & ARIMA(1,2,3)
 train <- newdata[1:40,] ## create new training dataset
 test <- newdata[41:50,] ## create new testing dataset
@@ -214,6 +224,17 @@ ggplot(train, aes(x=time, y= rh)) + geom_line(lwd=2) + ylim(0,80) + xlab("Date o
   geom_line(data=predAR1, aes(x=time, y=rh.pred), color="orange", lwd=2)+
   geom_line(data=predAR2, aes(x=time, y=rh.pred), color="blue", lwd=2)
   
+## check AIC and BIC
+AIC(arima1) < AIC(arima2)
+BIC(arima1) < BIC(arima2)
+
+## check normality of model fit
+hist(residuals(arima1))
+
+hist(residuals(arima2))
+
+## Check residuals
+checkresiduals(arima1)
 ```
 
 
