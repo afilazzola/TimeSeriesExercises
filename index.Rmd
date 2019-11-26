@@ -102,7 +102,7 @@ pacf(station$TempMax, main="Hamilton Station", ylab="Partial ACF", cex.lab=1.5, 
 
 ```
 
-### Identify Model
+### Identifying ARIMA Models
 ```{r}
 
 ### AR model first
@@ -160,7 +160,6 @@ AIC(ma) ## MA
 
 ## Is the AIC of AR better?
 AIC(ar) < AIC(ma) 
-
 
 ## Is the BIC of AR better?
 BIC(ar) < BIC(ma) 
