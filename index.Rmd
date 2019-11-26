@@ -215,5 +215,7 @@ ggplot(train, aes(x=time, y= rh)) + geom_line(lwd=2) + ylim(0,80) + xlab("Date o
   geom_line(data=predAR1, aes(x=time, y=rh.pred), color="orange", lwd=2)+
   geom_line(data=predAR2, aes(x=time, y=rh.pred), color="blue", lwd=2)
   
+```
+
 
 
