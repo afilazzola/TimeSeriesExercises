@@ -181,7 +181,7 @@ newdata <- data.frame(time=1:length(timeseries), rh = timeseries)
 ggplot(newdata, aes(x=time, y= rh)) + geom_line() + ylim(0,80) + xlab("Date of experiment") + ylab("Average daily humidity")+ theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank())
 
 ### First remove stationarity
-
+## Can check with an Augmented Dickie-Fuller test 
 ## Plot ACF
 acf(newdata$rh)
 
@@ -210,31 +210,36 @@ test <- newdata[41:50,] ## create new testing dataset
 
 
 arima1 <- arima(train$rh, order=c(1,1,3))
-arima2 <- arima(train$rh, order=c(1,2,3))
+arima2 <- arima(train$rh, order=c(0,1,2))
+arima3 <- arima(train$rh, order=c(1,1,2))
 
 arima1
 arima2
+arima3
 
 predAR1 <- data.frame(time=40:50, rh=predict(arima1, 11))
 predAR2 <- data.frame(time=40:50, rh=predict(arima2, 11))
+predAR3 <- data.frame(time=40:50, rh=predict(arima3, 11))
 
 ## Plot forecasts
 
 ggplot(train, aes(x=time, y= rh)) + geom_line(lwd=2) + ylim(0,80) + xlab("Date of experiment") + ylab("Average daily humidity")+ theme(text = element_text(size=20),  legend.position = "top", legend.direction = "horizontal", legend.title = element_blank()) + xlim(0,51) + geom_point(data=test, aes(x=time, y=rh), cex=2)+
   geom_line(data=predAR1, aes(x=time, y=rh.pred), color="orange", lwd=2)+
-  geom_line(data=predAR2, aes(x=time, y=rh.pred), color="blue", lwd=2)
+  geom_line(data=predAR2, aes(x=time, y=rh.pred), color="blue", lwd=2) +
+  geom_line(data=predAR3, aes(x=time, y=rh.pred), color="red", lwd=2)
   
 ## check AIC and BIC
-AIC(arima1) < AIC(arima2)
-BIC(arima1) < BIC(arima2)
+AIC(arima1) < AIC(arima3)
+BIC(arima1) < BIC(arima3)
 
 ## check normality of model fit
 hist(residuals(arima1))
 
-hist(residuals(arima2))
+hist(residuals(arima3))
+shapiro.test(residuals(arima3))
 
 ## Check residuals
-checkresiduals(arima1)
+checkresiduals(arima3)
 ```
 
 
